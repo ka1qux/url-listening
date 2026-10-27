@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=URL Listening
+Comment=Mapeia todos os domínios de um site para bloqueio no webfilter
+Exec=/opt/url-listening/url-listening
+Icon=url-listening
+Terminal=false
+Categories=Network;Security;
+Keywords=webfilter;bloqueio;url;dominio;firewall;

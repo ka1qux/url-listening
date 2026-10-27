@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>URL Listening</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='7' fill='%232457D6'/%3E%3Ccircle cx='13.5' cy='13.5' r='7' fill='none' stroke='%23fff' stroke-width='2.4'/%3E%3Cpath d='M18.6 18.6l7 7' stroke='%23fff' stroke-width='3.6' stroke-linecap='round'/%3E%3Ccircle cx='13.5' cy='13.5' r='3.4' fill='none' stroke='%23E63946' stroke-width='1.4'/%3E%3Cpath d='M11.2 15.8l4.6-4.6' stroke='%23E63946' stroke-width='1.4'/%3E%3C/svg%3E">
+<style>
+  /* Tokens: proposta do UI Designer (contraste WCAG AA verificado em claro e escuro). */
+  :root {
+    --bg: #F5F7FA; --surface: #FFFFFF; --surface-2: #F0F3F8; --surface-hover: #F5F8FD;
+    --border: #DDE2EA; --border-input: #8B95A5;
+    --text: #121826; --text-2: #4A5568; --text-3: #5F697B;
+    --accent: #2457D6; --accent-hover: #1C46B3; --accent-subtle: #EAF0FD; --on-accent: #FFFFFF;
+    --focus: 0 0 0 3px rgba(36, 87, 214, .35);
+    --block-fg: #B42318; --block-bg: #FDEEEC; --block-bd: #F3BDB6;
+    --review-fg: #8A4B00; --review-bg: #FFF4DD; --review-bd: #EFCF8F;
+    --keep-fg: #1A7342; --keep-bg: #E9F6EF; --keep-bd: #B4DCC4;
+    --code-bg: #F0F3F8; --selected: #EAF0FD;
+    --r-sm: 4px; --r-md: 6px; --r-lg: 10px; --r-pill: 999px;
+    --shadow-1: 0 1px 2px rgba(16, 24, 40, .06); --shadow-2: 0 4px 12px rgba(16, 24, 40, .10);
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas, monospace;
+    --row-h: 36px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1117; --surface: #151B24; --surface-2: #1C2430; --surface-hover: #1A2230;
+      --border: #2A3441; --border-input: #5E6B7D;
+      --text: #E6EAF0; --text-2: #A3AEBD; --text-3: #8592A3;
+      --accent: #7EA1FF; --accent-hover: #9BB6FF; --accent-subtle: #1A2540; --on-accent: #0B1020;
+      --focus: 0 0 0 3px rgba(126, 161, 255, .45);
+      --block-fg: #FF8F85; --block-bg: #3A1618; --block-bd: #6B2A2C;
+      --review-fg: #F5BC57; --review-bg: #33260E; --review-bd: #5E4618;
+      --keep-fg: #62D69A; --keep-bg: #0F2A1D; --keep-bd: #22513A;
+      --code-bg: #0F141C; --selected: #1A2540;
+      --shadow-1: none; --shadow-2: 0 4px 16px rgba(0, 0, 0, .45);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font-sans); }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  .mono { font-family: var(--font-mono); }
+  .muted { color: var(--text-2); }
+  .faint { color: var(--text-3); }
+  .hidden { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  :focus-visible { outline: none; box-shadow: var(--focus); }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* App bar */
+  .appbar { position: sticky; top: 0; z-index: 20; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .appbar .in { max-width: 1280px; height: 100%; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand svg { width: 28px; height: 28px; flex: none; }
+  .brand b { font-size: 16px; font-weight: 600; display: block; line-height: 1.2; }
+  .brand small { font-size: 12px; color: var(--text-3); display: block; }
+  .appbar .spacer { flex: 1; }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+  /* Botões */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid transparent; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; background: none; transition: background .12s, border-color .12s; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: var(--on-accent); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-secondary { background: var(--surface); border-color: var(--border-input); }
+  .btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
+  .btn-ghost { color: var(--text-2); }
+  .btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+  .btn-danger { color: var(--block-fg); border-color: var(--block-bd); background: var(--block-bg); }
+  .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+  .btn-lg { height: 44px; padding: 0 20px; font-size: 14px; }
+  .btn-block { width: 100%; }
+
+  /* Hero / formulário */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-1); }
+  .hero { padding: 20px; margin-bottom: 16px; }
+  .hero h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .hero p { margin: 0 0 16px; color: var(--text-2); font-size: 14px; }
+  .search { display: flex; gap: 8px; }
+  .field { position: relative; flex: 1; min-width: 0; }
+  .field svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-3); }
+  .field input { width: 100%; height: 44px; padding: 0 12px 0 36px; border: 1px solid var(--border-input); border-radius: var(--r-md); background: var(--surface); font-family: var(--font-mono); font-size: 14px; }
+  .field input:focus { border-color: var(--accent); box-shadow: var(--focus); outline: none; }
+  .opts { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; color: var(--text-2); }
+  label.chk { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  input[type=checkbox] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex: none; }
+
+  .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Alertas */
+  .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid; border-left-width: 3px; margin-top: 12px; color: var(--text); }
+  .alert svg { margin-top: 1px; }
+  .alert b { display: block; margin-bottom: 2px; }
+  .alert.review { background: var(--review-bg); border-color: var(--review-bd); border-left-color: var(--review-fg); }
+  .alert.review svg { color: var(--review-fg); }
+  .alert.block { background: var(--block-bg); border-color: var(--block-bd); border-left-color: var(--block-fg); }
+  .alert.block svg { color: var(--block-fg); }
+  .alert .btn { margin-top: 8px; }
+  .alert ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+  .alert code { font-family: var(--font-mono); font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 4px; overflow-wrap: anywhere; }
+  .kpi.ech { color: var(--on-accent); background: var(--block-fg); border-color: var(--block-fg); }
+  .tag.ech { color: var(--block-fg); background: var(--block-bg); border-color: var(--block-bd); font-weight: 600; }
+
+  /* Estado vazio */
+  .empty { padding: 40px 20px; text-align: center; }
+  .empty > svg { width: 40px; height: 40px; color: var(--text-3); stroke-width: 1.25; }
+  .empty h2 { font-size: 14px; font-weight: 600; margin: 12px 0 4px; }
+  .steps { list-style: none; padding: 0; margin: 20px auto 0; max-width: 760px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: left; counter-reset: s; }
+  .steps li { counter-increment: s; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+  .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-weight: 700; font-size: 12px; margin-bottom: 8px; }
+  .steps b { display: block; margin-bottom: 2px; }
+
+  /* Carregando */
+  .loading { padding: 20px; }
+  .loading-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .loading-head .spinner { color: var(--accent); }
+  .loading-head b { font-size: 14px; }
+  .stages { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 6px; }
+  .stages li { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+  .stages li .dot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--border-input); flex: none; }
+  .stages li.done { color: var(--text-2); }
+  .stages li.done .dot { background: var(--keep-fg); border-color: var(--keep-fg); }
+  .stages li.now { color: var(--text); font-weight: 600; }
+  .stages li.now .dot { border-color: var(--accent); background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .skel { height: 10px; border-radius: var(--r-sm); margin: 13px 0; background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* Layout de resultado */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+  .col { display: grid; gap: 16px; min-width: 0; }
+
+  /* Resumo + cadeia */
+  .summary { padding: 16px; }
+  .summary h2 { font-size: 16px; font-weight: 600; margin: 0 0 2px; outline: none; }
+  /* Foco programático só para o leitor de tela anunciar o resultado; sem anel visual. */
+  #sum-title:focus { box-shadow: none; }
+  .summary .meta { color: var(--text-2); word-break: break-word; }
+  .kpis { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .kpi { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-pill); border: 1px solid; font-weight: 600; font-size: 12px; }
+  .kpi.block { color: var(--block-fg); background: var(--block-bg); border-color: var(--block-bd); }
+  .kpi.review { color: var(--review-fg); background: var(--review-bg); border-color: var(--review-bd); }
+  .kpi.keep { color: var(--keep-fg); background: var(--keep-bg); border-color: var(--keep-bd); }
+  details.chain { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary .chev { transition: transform .15s; }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  .chain summary { color: var(--text-2); font-weight: 600; }
+  .timeline { list-style: none; margin: 12px 0 0; padding: 0; }
+  .timeline li { position: relative; padding: 0 0 14px 22px; min-width: 0; }
+  .timeline li::before { content: ""; position: absolute; left: 4px; top: 6px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); background: var(--surface); box-sizing: border-box; }
+  .timeline li::after { content: ""; position: absolute; left: 8px; top: 18px; bottom: 0; width: 2px; background: var(--border); }
+  .timeline li:last-child { padding-bottom: 0; }
+  .timeline li:last-child::after { display: none; }
+  .timeline li.final::before { background: var(--accent); }
+  .timeline li.err::before { border-color: var(--block-fg); background: var(--block-fg); }
+  .hop { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .hop .url { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .timeline li.final .url { font-weight: 600; }
+  .hop-kind { color: var(--text-3); font-size: 12px; margin-top: 2px; }
+  .code { font-family: var(--font-mono); font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: var(--r-sm); border: 1px solid; flex: none; }
+  .code.c2 { color: var(--keep-fg); background: var(--keep-bg); border-color: var(--keep-bd); }
+  .code.c3 { color: var(--review-fg); background: var(--review-bg); border-color: var(--review-bd); }
+  .code.c4, .code.cx { color: var(--block-fg); background: var(--block-bg); border-color: var(--block-bd); }
+
+  /* Seções de domínios */
+  .toolbar { padding: 12px 16px; display: flex; gap: 8px; align-items: center; }
+  .toolbar .field input { height: 36px; font-family: var(--font-sans); font-size: 13px; }
+  .section { overflow: hidden; }
+  .section > summary { padding: 12px 16px; gap: 10px; }
+  .section > summary h3 { font-size: 14px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .section > summary .count { color: var(--text-3); font-weight: 400; font-size: 12px; }
+  .section > summary .grow { flex: 1; }
+  .section-hint { padding: 0 16px 10px; margin-top: -4px; color: var(--text-2); }
+  .bulk { display: flex; gap: 4px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: var(--r-pill); border: 1px solid; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.bloquear { color: var(--block-fg); background: var(--block-bg); border-color: var(--block-bd); }
+  .badge.revisar { color: var(--review-fg); background: var(--review-bg); border-color: var(--review-bd); }
+  .badge.nao_bloquear { color: var(--keep-fg); background: var(--keep-bg); border-color: var(--keep-bd); }
+
+  ul.rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+  .row { display: grid; grid-template-columns: 16px minmax(0, 1.2fr) minmax(0, 1fr) 28px; gap: 12px; align-items: center; min-height: var(--row-h); padding: 4px 12px 4px 16px; border-bottom: 1px solid var(--border); }
+  .rows > li:last-child > .row { border-bottom: 0; }
+  .row:hover { background: var(--surface-hover); }
+  .row.on { background: var(--selected); box-shadow: inset 2px 0 0 var(--accent); }
+  .dom { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .dom .name { font-family: var(--font-mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .dom .n { color: var(--text-3); font-size: 12px; white-space: nowrap; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; min-width: 0; }
+  .tag { font-size: 11px; padding: 1px 7px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); white-space: nowrap; }
+  .expand { width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-md); background: none; color: var(--text-2); cursor: pointer; display: grid; place-items: center; }
+  .expand:hover { background: var(--surface-2); }
+  .expand[aria-expanded="true"] svg { transform: rotate(90deg); }
+  .hosts { list-style: none; margin: 0; padding: 4px 0 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .host { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 12px; padding: 6px 16px 6px 44px; align-items: start; }
+  .host .h { font-family: var(--font-mono); overflow-wrap: anywhere; }
+  .host .why { color: var(--text-2); font-size: 12px; }
+  .host .net { color: var(--text-3); font-size: 12px; font-family: var(--font-mono); overflow-wrap: anywhere; }
+  .none { padding: 16px; color: var(--text-2); }
+
+  /* Painel de saída */
+  .out { position: sticky; top: 72px; padding: 16px; display: grid; gap: 12px; max-height: calc(100vh - 88px); overflow: auto; }
+  .out h2 { font-size: 14px; font-weight: 600; margin: 0; }
+  .big { font-size: 28px; font-weight: 700; line-height: 1; }
+  .big small { font-size: 13px; font-weight: 400; color: var(--text-2); margin-left: 4px; }
+  .out select { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-input); border-radius: var(--r-md); background: var(--surface); }
+  .out label.lbl { font-size: 12px; font-weight: 600; color: var(--text-2); display: block; margin-bottom: 4px; }
+  .out textarea { width: 100%; min-height: 200px; height: 30vh; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--code-bg); font: 12.5px/1.6 var(--font-mono); resize: vertical; }
+  .actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .note { font-size: 12px; color: var(--text-2); }
+  .sites { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 2px; height: 26px; padding: 0 2px 0 10px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--surface-2); max-width: 100%; }
+  .chip.cur { border-color: var(--accent); background: var(--accent-subtle); }
+  .chip .go { border: 0; background: none; padding: 0; cursor: pointer; font-family: var(--font-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+  .chip .x { width: 22px; height: 22px; border: 0; border-radius: 50%; background: none; cursor: pointer; display: grid; place-items: center; color: var(--text-2); }
+  .chip .x:hover { background: var(--border); color: var(--text); }
+  .chip .x svg { width: 12px; height: 12px; }
+  .divider { border: 0; border-top: 1px solid var(--border); margin: 0; }
+
+  /* Barra fixa inferior (telas estreitas) */
+  .dock { display: none; }
+
+  @media (max-width: 1023px) {
+    main { padding: 20px; }
+    .layout { grid-template-columns: 1fr; }
+    .out { position: static; max-height: none; }
+    .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-2); }
+    .dock .grow { flex: 1; min-width: 0; }
+    .dock b { font-size: 15px; }
+    body.has-dock main { padding-bottom: 88px; }
+  }
+  @media (max-width: 767px) {
+    main { padding: 16px; }
+    .appbar .in { padding: 0 16px; }
+    .hero { padding: 16px; }
+    .search { flex-direction: column; }
+    .search .btn { width: 100%; }
+    .steps { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 16px minmax(0, 1fr) 28px; grid-template-areas: "c d e" ". t ."; padding: 8px 12px 8px 16px; row-gap: 4px; min-height: 44px; }
+    .row > input { grid-area: c; }
+    .row > .dom { grid-area: d; }
+    .row > .tags { grid-area: t; }
+    .row > .expand { grid-area: e; }
+    .host { padding-left: 16px; }
+    .section > summary { flex-wrap: wrap; }
+    .bulk { width: 100%; padding-left: 22px; }
+    .appbar .ver { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.3 7.3a8 8 0 1 0 11.4 0"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4"/><path d="M12 17.2v.1"/></symbol>
+  <symbol id="i-err" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<header class="appbar">
+  <div class="in">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" fill="#2457D6"/><circle cx="13.5" cy="13.5" r="7" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M18.6 18.6l7 7" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><circle cx="13.5" cy="13.5" r="3.4" fill="none" stroke="#E63946" stroke-width="1.4"/><path d="M11.2 15.8l4.6-4.6" stroke="#E63946" stroke-width="1.4"/></svg>
+      <div><b>URL Listening</b><small class="ver" id="ver">Mapeamento de domínios para webfilter</small></div>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn btn-ghost" id="quit" type="button"><svg class="i"><use href="#i-power"/></svg>Encerrar app</button>
+  </div>
+</header>
+
+<main>
+  <section class="card hero" aria-labelledby="h-title">
+    <h1 id="h-title">Analisar site</h1>
+    <p>Descubra todos os domínios ligados a um site e monte a lista para o objeto de bloqueio do webfilter.</p>
+    <form id="form" class="search" novalidate>
+      <label class="sr-only" for="url">URL ou domínio do site</label>
+      <div class="field">
+        <svg class="i"><use href="#i-link"/></svg>
+        <input type="text" id="url" placeholder="site.com ou https://encurtador.com/abc" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      </div>
+      <button class="btn btn-primary btn-lg" id="go" type="submit"><span id="go-label">Analisar</span></button>
+    </form>
+    <div class="opts">
+      <label class="chk"><input type="checkbox" id="variants" checked> Testar domínios espelho (.net, .xxx, m., www.)</label>
+    </div>
+    <div id="form-alert"></div>
+  </section>
+
+  <div id="status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- Estado vazio -->
+  <section id="empty" class="card empty">
+    <svg class="i"><use href="#i-search"/></svg>
+    <h2>Nenhuma análise ainda</h2>
+    <p class="muted">Leva de 5 segundos a 1 minuto por site.</p>
+    <ol class="steps">
+      <li><b>Cole a URL</b><span class="muted">Do site ou link que está contornando o bloqueio.</span></li>
+      <li><b>Revise</b><span class="muted">Os itens em "Revisar" pedem sua decisão; o resto já vem marcado.</span></li>
+      <li><b>Copie a lista</b><span class="muted">E cole no objeto de bloqueio do webfilter.</span></li>
+    </ol>
+  </section>
+
+  <!-- Carregando -->
+  <section id="loading" class="card loading hidden" aria-busy="true">
+    <div class="loading-head"><span class="spinner"></span><div><b id="load-title">Analisando...</b><div class="muted"><span id="elapsed">0 s</span> decorridos. Pode levar até 1 minuto.</div></div></div>
+    <ol class="stages" id="stages"></ol>
+    <p class="faint" style="margin:0 0 8px">Etapas estimadas pelo tempo: o servidor só responde ao final.</p>
+    <div class="skel" style="width:92%"></div><div class="skel" style="width:76%"></div><div class="skel" style="width:84%"></div><div class="skel" style="width:60%"></div>
+    <button class="btn btn-secondary" id="cancel" type="button">Cancelar</button>
+  </section>
+
+  <!-- Resultado -->
+  <div id="results" class="layout hidden">
+    <div class="col">
+      <section class="card summary">
+        <h2 id="sum-title" tabindex="-1"></h2>
+        <div class="meta" id="sum-meta"></div>
+        <div class="kpis" id="kpis"></div>
+        <div id="alerts"></div>
+        <details class="chain" id="chain-box">
+          <summary><svg class="i chev"><use href="#i-chev"/></svg><span id="chain-sum"></span></summary>
+          <ol class="timeline" id="chain"></ol>
+        </details>
+      </section>
+
+      <div class="card toolbar">
+        <div class="field">
+          <svg class="i"><use href="#i-search"/></svg>
+          <label class="sr-only" for="q">Filtrar domínios</label>
+          <input type="search" id="q" placeholder="Filtrar domínios (ex.: cdn)">
+        </div>
+      </div>
+
+      <div id="sections" class="col"></div>
+    </div>
+
+    <aside class="card out" aria-labelledby="out-title">
+      <h2 id="out-title">Lista para o webfilter</h2>
+      <div class="big" id="out-count">0</div>
+      <div>
+        <label class="lbl" for="format">Formato</label>
+        <select id="format">
+          <option value="domain">Domínio (site.com)</option>
+          <option value="wildcard">Curinga (*.site.com)</option>
+          <option value="both">Domínio + curinga</option>
+          <option value="host">Hosts exatos</option>
+          <option value="ip">Endereços IP</option>
+        </select>
+        <p class="note hidden" id="ipnote">IPs de CDN (Cloudflare, Akamai...) são compartilhados com outros sites: bloqueie por IP só quando ele for dedicado.</p>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary btn-lg" id="copy" type="button"><svg class="i"><use href="#i-copy"/></svg><span>Copiar lista</span></button>
+        <button class="btn btn-secondary btn-lg" id="download" type="button" title="Baixar .txt" aria-label="Baixar lista em .txt"><svg class="i"><use href="#i-down"/></svg>.txt</button>
+      </div>
+      <label class="sr-only" for="output">Prévia da lista</label>
+      <textarea id="output" readonly spellcheck="false"></textarea>
+      <hr class="divider">
+      <div>
+        <div class="lbl" id="sites-label">Sites nesta lista</div>
+        <div class="sites" id="sites" role="list" aria-labelledby="sites-label"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="clear" type="button">Limpar lista</button>
+    </aside>
+  </div>
+</main>
+
+<div class="dock hidden" id="dock">
+  <div class="grow"><b id="dock-count">0</b> <span class="muted" id="dock-unit">domínios</span></div>
+  <button class="btn btn-primary" id="dock-copy" type="button"><svg class="i"><use href="#i-copy"/></svg><span>Copiar lista</span></button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  /** Cria um elemento. Conteúdo sempre via textContent: os dados vêm de sites de terceiros. */
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === false || v == null) continue;
+      if (k === "class") node.className = v;
+      else if (k === "text") node.textContent = v;
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of children) if (c != null) node.append(typeof c === "string" ? document.createTextNode(c) : c);
+    return node;
+  }
+  function icon(name) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "i");
+    svg.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "#i-" + name);
+    svg.append(use);
+    return svg;
+  }
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  const VERDICTS = {
+    revisar: { label: "Revisar", hint: "Decida você: podem ser de terceiros. Desmarcados por padrão.", open: true },
+    bloquear: { label: "Bloquear", hint: "Ligados ao site. Já marcados para a lista.", open: true },
+    nao_bloquear: { label: "Não bloquear", hint: "Compartilhados por muitos sites: bloquear quebraria a navegação.", open: false },
+  };
+  const HOP_KIND = { http: "Redirecionamento HTTP", meta: "Meta refresh", js: "Redirecionamento por JavaScript", final: "Destino final", erro: "Falha", loop: "Loop de redirecionamento" };
+
+  // Motivos longos do backend viram rótulos curtos e deduplicados.
+  const TAG_RULES = [
+    [/cadeia de redirecionamento|faz parte da cadeia/, "Redirecionamento"],
+    [/certificado/, "Certificado"],
+    [/canonical|og:url|hreflang/, "Identidade"],
+    [/espelho/, "Espelho"],
+    [/subdomínio comum/, "Variante"],
+    [/subdomínio do próprio/, "Subdomínio"],
+    [/contém o nome do site/, "CDN própria"],
+    [/CNAME/, "CNAME"],
+    [/compartilhado/, "Compartilhado"],
+    [/terceiro/, "Terceiro"],
+    [/sem vínculo/, "Sem vínculo"],
+    [/nome público do ECH/, "Nome público ECH"],
+  ];
+  function tagsFor(reasons) {
+    const tags = new Set();
+    for (const r of reasons) for (const [re, t] of TAG_RULES) if (re.test(r)) tags.add(t);
+    return [...tags];
+  }
+
+  // ---------------------------------------------------------------- estado
+  const sites = new Map();   // input_url -> { report, entries: Map(host -> entry) }
+  let current = null;        // input_url exibido
+  let query = "";
+  const expanded = new Set(); // chaves "veredito|domínio" abertas
+
+  function addReport(report) {
+    const entries = new Map();
+    for (const d of report.domains) entries.set(d.host, { ...d, checked: d.verdict === "bloquear", tags: tagsFor(d.reasons).concat(d.ech ? ["ECH"] : []) });
+    sites.set(report.input_url, { report, entries });
+    current = report.input_url;
+  }
+
+  function selectedEntries() {
+    const out = [];
+    for (const s of sites.values()) for (const e of s.entries.values()) if (e.checked) out.push(e);
+    return out;
+  }
+
+  // ---------------------------------------------------------------- saída
+  function outputLines() {
+    const fmt = $("format").value;
+    const set = new Set();
+    for (const e of selectedEntries()) {
+      const isIp = /^[\d.]+$|:/.test(e.host);
+      if (fmt === "ip") { e.ips.forEach((ip) => set.add(ip)); continue; }
+      if (fmt === "host" || isIp) { set.add(e.host); continue; }
+      if (fmt !== "wildcard") set.add(e.registrable);
+      if (fmt !== "domain") set.add("*." + e.registrable);
+    }
+    return [...set].sort();
+  }
+  const UNIT = { domain: ["domínio", "domínios"], wildcard: ["entrada", "entradas"], both: ["entrada", "entradas"], host: ["host", "hosts"], ip: ["IP", "IPs"] };
+
+  function renderOutput() {
+    const lines = outputLines();
+    const [one, many] = UNIT[$("format").value];
+    $("output").value = lines.join("\n");
+    $("out-count").replaceChildren(String(lines.length), el("small", { text: lines.length === 1 ? one : many }));
+    $("dock-count").textContent = String(lines.length);
+    $("dock-unit").textContent = lines.length === 1 ? one : many;
+    $("ipnote").classList.toggle("hidden", $("format").value !== "ip");
+    for (const b of [$("copy"), $("dock-copy"), $("download")]) b.disabled = lines.length === 0;
+    $("output").placeholder = "Nenhum item selecionado. Marque domínios à esquerda para incluí-los.";
+    renderSites();
+  }
+
+  function renderSites() {
+    const box = $("sites");
+    box.replaceChildren();
+    for (const [key, s] of sites) {
+      const host = s.report.final_url ? new URL(s.report.final_url).hostname : new URL(key).hostname;
+      box.append(el("span", { class: "chip" + (key === current ? " cur" : ""), role: "listitem" },
+        el("button", { class: "go", type: "button", title: "Ver " + key, text: host, onclick: () => { current = key; renderAll(); } }),
+        el("button", { class: "x", type: "button", "aria-label": "Remover " + host + " da lista", onclick: () => removeSite(key) }, icon("x"))));
+    }
+    $("clear").disabled = sites.size === 0;
+  }
+
+  function removeSite(key) {
+    sites.delete(key);
+    if (current === key) current = sites.keys().next().value ?? null;
+    if (!current) { showView("empty"); resetClear(); $("dock").classList.add("hidden"); document.body.classList.remove("has-dock"); }
+    renderAll();
+  }
+
+  // ---------------------------------------------------------------- resultado
+  function groupsFor(site) {
+    const byVerdict = { revisar: new Map(), bloquear: new Map(), nao_bloquear: new Map() };
+    const q = query.trim().toLowerCase();
+    for (const e of site.entries.values()) {
+      if (q && !e.host.includes(q)) continue;
+      const g = byVerdict[e.verdict];
+      if (!g.has(e.registrable)) g.set(e.registrable, []);
+      g.get(e.registrable).push(e);
+    }
+    return byVerdict;
+  }
+
+  function renderSummary(site) {
+    const r = site.report;
+    const all = [...site.entries.values()];
+    const regs = (v) => new Set(all.filter((e) => e.verdict === v).map((e) => e.registrable)).size;
+    $("sum-title").textContent = r.title || (r.final_url ? new URL(r.final_url).hostname : r.input_url);
+    $("sum-meta").replaceChildren(
+      el("span", { class: "mono", text: r.input_url }), " → ",
+      el("span", { class: "mono", text: r.final_url || "destino não alcançado" }));
+    $("kpis").replaceChildren(
+      el("span", { class: "kpi block", text: plural(regs("bloquear"), "domínio para bloquear", "domínios para bloquear") }),
+      el("span", { class: "kpi review", text: plural(regs("revisar"), "para revisar", "para revisar") }),
+      el("span", { class: "kpi keep", text: plural(regs("nao_bloquear"), "compartilhado", "compartilhados") }),
+      r.ech && r.ech.length ? el("span", { class: "kpi ech", text: "ECH ativo" }) : null);
+
+    const alerts = $("alerts");
+    alerts.replaceChildren();
+    const last = r.hops[r.hops.length - 1];
+    if (last && (last.kind === "erro" || last.kind === "loop")) {
+      alerts.append(alert("block", "err", friendlyHopError(last), last.error || ""));
+    }
+    if (r.ech && r.ech.length) alerts.append(echAlert(r.ech));
+    for (const w of r.warnings) {
+      if (w.startsWith("Falha em") || w.startsWith("ECH ativo")) continue;  // já explicados nos alertas acima
+      alerts.append(alert("review", "warn", w.includes("QUIC") ? "O site usa QUIC (HTTP/3)" : "Atenção", w));
+    }
+
+    const finalHost = r.final_url ? new URL(r.final_url).hostname : "destino não alcançado";
+    $("chain-sum").textContent = `Cadeia de redirecionamento: ${plural(r.hops.length, "salto", "saltos")}, termina em ${finalHost}`;
+    $("chain").replaceChildren(...r.hops.map((h) => {
+      const cls = h.kind === "final" ? "final" : (h.kind === "erro" || h.kind === "loop") ? "err" : "";
+      const code = h.status ? String(h.status) : "---";
+      const codeCls = h.status ? "c" + String(h.status)[0] : "cx";
+      return el("li", { class: cls },
+        el("div", { class: "hop" }, el("span", { class: "code " + codeCls, text: code }), el("span", { class: "url", title: h.url, text: h.url })),
+        el("div", { class: "hop-kind", text: HOP_KIND[h.kind] + (h.error ? ": " + h.error : "") }));
+    }));
+  }
+
+  /** Alerta de ECH com o passo a passo: é a causa mais comum de "bloqueio por nome não funciona". */
+  function echAlert(ech) {
+    const hosts = [...new Set(ech.map((i) => i.host))];
+    const publics = [...new Set(ech.map((i) => i.public_name))];
+    const code = (t) => el("code", { text: t });
+    return el("div", { class: "alert block", role: "alert" }, icon("err"),
+      el("div", {},
+        el("b", { text: "ECH ativo: o webfilter não vê o nome deste site" }),
+        el("span", { class: "muted" }, "O navegador criptografa ", code(hosts.join(", ")),
+          " e o firewall só enxerga ", code(publics.join(", ")),
+          ". Por isso o bloqueio por nome falha e só funciona bloqueando a CDN inteira. Para corrigir:"),
+        el("ol", {},
+          el("li", {}, "Desative o ECH por política nos navegadores: Chrome/Edge ", code("EncryptedClientHelloEnabled = false"),
+            "; Firefox ", code("network.dns.echconfig.enabled = false"), "."),
+          el("li", {}, "Obrigue o uso do DNS da rede: bloqueie DoH (categoria de DNS sobre HTTPS), DoT (TCP/853) e DNS externo; faça ",
+            code("use-application-dns.net"), " responder NXDOMAIN."),
+          el("li", {}, "Bloqueie ", code(hosts.join(", ")), " também no filtro DNS: sem resolver o IP, não há acesso, com ou sem ECH."),
+          el("li", {}, "Bloqueie UDP/443 (QUIC) para o tráfego usar TCP."),
+          el("li", {}, "Não bloqueie ", code(publics.join(", ")), " nem os IPs da CDN: são compartilhados com milhões de sites."))));
+  }
+
+  function friendlyHopError(hop) {
+    const e = (hop.error || "").toLowerCase();
+    const host = hop.host || "o site";
+    if (hop.kind === "loop") return "O site entra em loop de redirecionamento.";
+    if (/name or service|getaddrinfo|nodename|no address|name resolution|errno -[23]/.test(e)) return `Não foi possível encontrar ${host}. Confira o endereço ou tente com www.`;
+    if (/timeout|timed out/.test(e)) return `${host} demorou demais para responder. Tente novamente ou desmarque os espelhos.`;
+    if (/refused|reset|aborted/.test(e)) return `A conexão com ${host} foi recusada. Se esta máquina está atrás do webfilter, libere o IP dela e analise de novo.`;
+    return `A análise parou em ${host}.`;
+  }
+
+  function alert(kind, iconName, title, text) {
+    return el("div", { class: "alert " + kind, role: kind === "block" ? "alert" : null }, icon(iconName),
+      el("div", {}, el("b", { text: title }), text ? el("span", { class: "muted", text }) : null));
+  }
+
+  function renderSections(site) {
+    const groups = groupsFor(site);
+    const box = $("sections");
+    box.replaceChildren();
+    for (const verdict of ["revisar", "bloquear", "nao_bloquear"]) {
+      const map = groups[verdict];
+      const totalHosts = [...map.values()].reduce((a, l) => a + l.length, 0);
+      const cfg = VERDICTS[verdict];
+      if (map.size === 0 && verdict !== "revisar") continue;
+      const det = el("details", { class: "card section" });
+      det.open = cfg.open || Boolean(query);
+      const bulk = el("span", { class: "bulk" },
+        el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Marcar todos", onclick: (ev) => { ev.preventDefault(); setMany(map, true); } }),
+        el("button", { class: "btn btn-ghost btn-sm", type: "button", text: "Desmarcar", onclick: (ev) => { ev.preventDefault(); setMany(map, false); } }));
+      det.append(el("summary", {},
+        icon("chev"),
+        el("h3", {}, el("span", { class: "badge " + verdict, text: cfg.label }),
+          el("span", { class: "count", text: `${plural(map.size, "domínio", "domínios")} · ${plural(totalHosts, "host", "hosts")}` })),
+        el("span", { class: "grow" }),
+        map.size ? bulk : null));
+      det.querySelector("summary > svg").classList.add("chev");
+      det.append(el("p", { class: "section-hint", text: cfg.hint }));
+      if (map.size === 0) {
+        det.append(el("div", { class: "none", text: query ? "Nenhum domínio corresponde ao filtro." : "Nada para revisar neste site." }));
+      } else {
+        const ul = el("ul", { class: "rows" });
+        const regs = [...map.keys()].sort((a, b) => map.get(b).length - map.get(a).length || a.localeCompare(b));
+        for (const reg of regs) ul.append(groupRow(verdict, reg, map.get(reg)));
+        det.append(ul);
+      }
+      box.append(det);
+    }
+  }
+
+  function groupRow(verdict, reg, entries) {
+    const key = verdict + "|" + reg;
+    const li = el("li");
+    const nOn = entries.filter((e) => e.checked).length;
+    const cb = el("input", { type: "checkbox", "aria-label": `Incluir ${reg} na lista` });
+    cb.checked = nOn === entries.length;
+    cb.indeterminate = nOn > 0 && nOn < entries.length;
+    cb.addEventListener("change", () => { entries.forEach((e) => (e.checked = cb.checked)); renderAll(); });
+    const tags = new Set(entries.flatMap((e) => e.tags));
+    const open = expanded.has(key);
+    const btn = el("button", { class: "expand", type: "button", "aria-expanded": String(open), "aria-label": `Ver hosts de ${reg}` }, icon("chev"));
+    btn.addEventListener("click", () => { open ? expanded.delete(key) : expanded.add(key); renderAll(); });
+    li.append(el("div", { class: "row" + (nOn ? " on" : "") },
+      cb,
+      el("div", { class: "dom" }, el("span", { class: "name", title: reg, text: reg }),
+        el("span", { class: "n", text: entries.length > 1 ? plural(entries.length, "host", "hosts") : "" })),
+      el("div", { class: "tags" }, ...[...tags].map((t) => el("span", { class: t === "ECH" ? "tag ech" : "tag", text: t }))),
+      btn));
+    if (open) {
+      const ul = el("ul", { class: "hosts" });
+      for (const e of [...entries].sort((a, b) => a.host.localeCompare(b.host))) {
+        const hcb = el("input", { type: "checkbox", "aria-label": `Incluir ${e.host}` });
+        hcb.checked = e.checked;
+        hcb.addEventListener("change", () => { e.checked = hcb.checked; renderAll(); });
+        const net = [e.ech ? "ECH: firewall vê " + e.ech : "", e.ips.length ? "IP " + e.ips.join(", ") : "", e.cnames.length ? "CNAME " + e.cnames.join(" → ") : ""].filter(Boolean).join("  ·  ");
+        ul.append(el("li", { class: "host" }, hcb,
+          el("div", {}, el("div", { class: "h", text: e.host }), el("div", { class: "why", text: [...new Set(e.reasons)].join("; ") }), net ? el("div", { class: "net", text: net }) : null)));
+      }
+      li.append(ul);
+    }
+    return li;
+  }
+
+  function setMany(map, value) {
+    for (const list of map.values()) list.forEach((e) => (e.checked = value));
+    renderAll();
+  }
+
+  function renderAll() {
+    if (!current) { renderOutput(); return; }
+    const site = sites.get(current);
+    renderSummary(site);
+    renderSections(site);
+    renderOutput();
+  }
+
+  // ---------------------------------------------------------------- views
+  function showView(name) {
+    $("empty").classList.toggle("hidden", name !== "empty");
+    $("loading").classList.toggle("hidden", name !== "loading");
+    $("results").classList.toggle("hidden", name !== "results");
+  }
+
+  const STAGES = [
+    [0, "Seguindo redirecionamentos"],
+    [3, "Lendo certificado TLS e página"],
+    [7, "Consultando DNS dos domínios"],
+    [14, "Testando domínios espelho"],
+  ];
+  let timer = null;
+  let controller = null;
+
+  function startLoading(url, variants) {
+    const stages = STAGES.filter((s) => variants || !s[1].includes("espelho"));
+    const started = performance.now();
+    $("load-title").textContent = "Analisando " + url;
+    const tick = () => {
+      const secs = Math.floor((performance.now() - started) / 1000);
+      $("elapsed").textContent = secs + " s";
+      let idx = 0;
+      stages.forEach((s, i) => { if (secs >= s[0]) idx = i; });
+      $("stages").replaceChildren(...stages.map((s, i) =>
+        el("li", { class: i < idx ? "done" : i === idx ? "now" : "" }, el("span", { class: "dot" }), s[1])));
+    };
+    tick();
+    timer = setInterval(tick, 1000);
+    if (!sites.size) showView("loading");
+    else { $("loading").classList.remove("hidden"); $("empty").classList.add("hidden"); }
+    if (sites.size) $("loading").scrollIntoView({ block: "nearest" });
+    return started;
+  }
+
+  function stopLoading() {
+    clearInterval(timer);
+    $("loading").classList.add("hidden");
+    setBusy(false);
+  }
+
+  function setBusy(busy) {
+    $("go").disabled = busy;
+    $("go").setAttribute("aria-busy", String(busy));
+    $("go").replaceChildren(busy ? el("span", { class: "spinner" }) : "", el("span", { id: "go-label", text: busy ? "Analisando..." : "Analisar" }));
+  }
+
+  function formError(title, text) {
+    $("form-alert").replaceChildren(title ? alert("block", "err", title, text) : "");
+    if (title) $("status").textContent = title;
+  }
+
+  // ---------------------------------------------------------------- ações
+  $("form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const url = $("url").value.trim();
+    formError(null);
+    if (!url) { formError("Informe a URL ou o domínio do site.", ""); $("url").focus(); return; }
+    const variants = $("variants").checked;
+    setBusy(true);
+    const started = startLoading(url, variants);
+    controller = new AbortController();
+    $("status").textContent = "Analisando " + url;
+    try {
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, variants }),
+        signal: controller.signal,
+      });
+      let data;
+      try { data = await resp.json(); } catch { throw new Error("Resposta inválida do servidor."); }
+      if (!resp.ok) {
+        const msg = data.error || resp.statusText;
+        throw new Error(/inválida/i.test(msg) ? `Endereço inválido: use um domínio (site.com) ou URL http/https.` : msg);
+      }
+      stopLoading();
+      addReport(data);
+      expanded.clear();
+      query = ""; $("q").value = "";
+      showView("results");
+      $("dock").classList.remove("hidden");
+      document.body.classList.add("has-dock");
+      renderAll();
+      const secs = Math.round((performance.now() - started) / 1000);
+      const site = sites.get(current);
+      const regs = (v) => new Set([...site.entries.values()].filter((e) => e.verdict === v).map((e) => e.registrable)).size;
+      $("status").textContent = `Análise concluída em ${secs} s: ${plural(regs("bloquear"), "domínio", "domínios")} para bloquear, ${regs("revisar")} para revisar.`;
+      $("sum-title").focus();
+    } catch (err) {
+      stopLoading();
+      showView(sites.size ? "results" : "empty");
+      if (err.name === "AbortError") { $("status").textContent = "Análise cancelada."; return; }
+      if (err instanceof TypeError) formError("O URL Listening não está respondendo.", "Ele pode ter sido encerrado. Abra o aplicativo de novo e repita a análise.");
+      else formError("Não foi possível analisar.", err.message);
+    } finally {
+      controller = null;
+    }
+  });
+
+  $("cancel").addEventListener("click", () => controller && controller.abort());
+  $("q").addEventListener("input", () => { query = $("q").value; if (current) renderSections(sites.get(current)); });
+  $("format").addEventListener("change", renderOutput);
+
+  async function copyList(btn) {
+    const text = $("output").value;
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); }
+    catch { $("output").select(); document.execCommand("copy"); }
+    const label = btn.querySelector("span");
+    const n = outputLines().length;
+    btn.replaceChildren(icon("check"), el("span", { text: `Copiado: ${n}` }));
+    $("status").textContent = `Lista copiada: ${n} itens.`;
+    setTimeout(() => btn.replaceChildren(icon("copy"), label), 1500);
+  }
+  $("copy").addEventListener("click", () => copyList($("copy")));
+  $("dock-copy").addEventListener("click", () => copyList($("dock-copy")));
+
+  $("download").addEventListener("click", () => {
+    const blob = new Blob([$("output").value + "\n"], { type: "text/plain" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: "objeto_bloqueio.txt" });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  // Limpar pede confirmação no próprio botão (sem diálogo modal do navegador).
+  let clearTimer = null;
+  function resetClear() {
+    clearTimeout(clearTimer);
+    const b = $("clear");
+    b.className = "btn btn-ghost btn-sm";
+    b.textContent = "Limpar lista";
+    delete b.dataset.armed;
+  }
+  $("clear").addEventListener("click", () => {
+    const b = $("clear");
+    if (!b.dataset.armed) {
+      b.dataset.armed = "1";
+      b.className = "btn btn-danger btn-sm";
+      b.textContent = `Confirmar: remover ${plural(sites.size, "site", "sites")}`;
+      clearTimer = setTimeout(resetClear, 4000);
+      return;
+    }
+    resetClear();
+    sites.clear();
+    current = null;
+    showView("empty");
+    $("dock").classList.add("hidden");
+    document.body.classList.remove("has-dock");
+    renderOutput();
+    $("status").textContent = "Lista limpa.";
+    $("url").focus();
+  });
+
+  $("quit").addEventListener("click", async () => {
+    try { await fetch("/api/shutdown", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); } catch { /* já encerrado */ }
+    document.body.replaceChildren(el("main", {}, el("section", { class: "card empty" },
+      el("h2", { text: "URL Listening encerrado" }), el("p", { class: "muted", text: "Pode fechar esta aba. Para usar de novo, abra o aplicativo pelo menu." }))));
+  });
+
+  // Mantém o aplicativo vivo enquanto a aba estiver aberta (ver app.py) e mostra a versão.
+  const ping = () => fetch("/api/ping", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+    if (d.version) $("ver").textContent = "versão " + d.version;
+  }).catch(() => {});
+  ping();
+  setInterval(ping, 20000);
+  $("url").focus();
+})();
+</script>
+</body>
+</html>
